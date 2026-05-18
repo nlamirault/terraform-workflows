@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: Copyright (C) Nicolas Lamirault <nicolas.lamirault@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+name: Terraform / Attest OCI
+
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      registry:
+        description: OCI registry hostname
+        type: string
+        default: ghcr.io
+      subject-name:
+        description: Fully-qualified image name (e.g. ghcr.io/owner/repo/module)
+        required: true
+        type: string
+      subject-digest:
+        description: Image digest (sha256:...)
+        required: true
+        type: string
+    secrets:
+      registry-username:
+        required: true
+      registry-password:
+        required: true
+
+# Signing runs in an isolated job so the OIDC identity on the attestation
+# is this reusable workflow, not the caller — required for SLSA Build L3.
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write # needed for GitHub Attestations API
+      id-token: write # needed for Sigstore OIDC signing certificate
+      packages: write # needed to push attestation to OCI registry
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      with:
+        egress-policy: audit
+
+    - name: Login to OCI registry
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ secrets.registry-username }}
+        password: ${{ secrets.registry-password }}
+
+    - name: Attest build provenance
+      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      with:
+        subject-name: ${{ inputs.subject-name }}
+        subject-digest: ${{ inputs.subject-digest }}
+        push-to-registry: true
