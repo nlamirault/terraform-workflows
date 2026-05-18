@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: Copyright (C) Nicolas Lamirault <nicolas.lamirault@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+BANNER = T E R R A F O R M  W O R K F L O W S
+
+SHELL = /bin/bash -o pipefail
+
+DIR = $(shell pwd)
+
+NO_COLOR=\033[0m
+OK_COLOR=\033[32;01m
+ERROR_COLOR=\033[31;01m
+WARN_COLOR=\033[33;01m
+INFO_COLOR=\033[36m
+WHITE_COLOR=\033[1m
+MAKE_COLOR=\033[33;01m%-20s\033[0m
+
+.DEFAULT_GOAL := help
+
+OK=[🟢]
+KO=[🔴]
+WARN=[🟠]
+INFO=[🔵]
+
+
+.PHONY: help
+help:
+	@echo -e "$(OK_COLOR)      $(BANNER)$(NO_COLOR)"
+	@echo "------------------------------------------------------------------"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${INFO_COLOR}<target>${NO_COLOR}\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  ${INFO_COLOR}%-25s${NO_COLOR} %s\n", $$1, $$2 } /^##@/ { printf "\n${WHITE_COLOR}%s${NO_COLOR}\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@echo ""
+
+guard-%:
+	@if [ "${${*}}" = "" ]; then \
+		echo -e "$(ERROR_COLOR)Environment variable $* not set$(NO_COLOR)"; \
+		exit 1; \
+	fi
+
+check-%:
+	@if $$(hash $* 2> /dev/null); then \
+		echo -e "$(OK_COLOR)$(OK)$(NO_COLOR) $*"; \
+	else \
+		echo -e "$(ERROR_COLOR)$(KO)$(NO_COLOR) $*"; \
+	fi
+
+.PHONY: clean
+clean: ## Clean project
+	@echo -e "$(INFO)$(INFO_COLOR)[Clean] Processing $(NO_COLOR)"
+
+##@ Development
+
+.PHONY: license-check
+license-check: ## Check license headers
+	@echo -e "$(INFO)$(INFO_COLOR)[License] Checking headers$(NO_COLOR)"
+	license-eye header check
+
+.PHONY: license-fix
+license-fix: ## Fix license headers
+	@echo -e "$(INFO)$(INFO_COLOR)[License] Fixing headers$(NO_COLOR)"
+	license-eye header fix
+
+.PHONY: lint
+lint: ## Lint all files
+	@echo -e "$(INFO)$(INFO_COLOR)[Lint] Processing$(NO_COLOR)"
+	prek run -a
